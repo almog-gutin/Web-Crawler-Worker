@@ -11,6 +11,6 @@ const redisClient = redis.createClient({ host, port });
 
 redisClient.on('ready', () => console.log(chalk.red.bold('Reddis client connected!')));
 
-redisClient.on('error', () => console.log(chalk.red.inverse('Reddis client error!')), error);
+redisClient.on('error', () => console.log(chalk.red.inverse('Reddis client error!')));
 
 module.exports = redisClient;

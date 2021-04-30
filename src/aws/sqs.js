@@ -3,7 +3,7 @@ const sqs = require('./aws');
 
 const sendMeesageToQueue = async (queueURL, data) => {
     const params = {
-        QueueURL: queueURL,
+        QueueUrl: queueURL,
         MessageAttributes: {
             'queueName': {
                 DataType: 'String',
@@ -12,6 +12,10 @@ const sendMeesageToQueue = async (queueURL, data) => {
             'id': {
                 DataType: 'String',
                 StringValue: data.id,
+            },
+            'url': {
+                DataType: 'String',
+                StringValue: data.url,
             },
             'level': {
                 DataType: 'String',
@@ -42,21 +46,21 @@ const sendMeesageToQueue = async (queueURL, data) => {
 
 const pullMessageFromQueue = async (queueURL) => {
     const params = {
-        QueueURL: queueURL,
-        MessageAttributes: ['All'],
+        QueueUrl: queueURL,
+        MessageAttributeNames: ['All'],
         MaxNumberOfMessages: 10,
-        VisibilityTimeOut: 300,
+        VisibilityTimeout: 30,
         WaitTimeSeconds: 5,
     };
 
     try {
-        const { Messages } = await sqs.recieveMessage(params).promise();
+        const { Messages } = await sqs.receiveMessage(params).promise();
         if (!Messages) return;
 
         const messagesArray = [];
         for (let message of Messages) {
             const messageAttributes = {};
-            const receiptHandle = message.receiptHandle;
+            const receiptHandle = message.ReceiptHandle;
 
             for (let [key, value] of Object.entries(message.MessageAttributes))
                 messageAttributes[key] = value.StringValue;
@@ -64,7 +68,6 @@ const pullMessageFromQueue = async (queueURL) => {
             messagesArray.push({ messageAttributes, receiptHandle });
         }
 
-        console.log(messagesArray);
         return messagesArray;
     } catch (err) {
         console.log(chalk.red.inverse('Error while recieveing messages from sqs:'), err);
@@ -73,7 +76,7 @@ const pullMessageFromQueue = async (queueURL) => {
 
 const deleteMessageFromQueue = async (queueURL, receiptHandle, messageID) => {
     const params = {
-        QueueURL: queueURL,
+        QueueUrl: queueURL,
         ReceiptHandle: receiptHandle,
     };
 
@@ -85,20 +88,9 @@ const deleteMessageFromQueue = async (queueURL, receiptHandle, messageID) => {
     }
 };
 
-const deleteQueue = async (queueURL) => {
-    const params = { QueueURL: queueURL };
-
-    try {
-        const deletedQueue = await sqs.deleteQueue(params).promise();
-        console.log(chalk.blue(`Queue was deleted!`));
-    } catch (err) {
-        console.log(chalk.red.inverse('Error while deleting a queue:'), err);
-    }
-};
-
 const getNumberOfMessagesInQueue = async (queueURL) => {
     const params = {
-        QueueURL: queueURL,
+        QueueUrl: queueURL,
         AttributeNames: [
             'ApproximateNumberOfMessages',
             'ApproximateNumberOfMessagesDelayed',
@@ -107,10 +99,10 @@ const getNumberOfMessagesInQueue = async (queueURL) => {
     };
 
     try {
-        const { attributes } = await sqs.getQueueAttributes(params).promise();
-        const availableMessages = parseInt(attributes.ApproximateNumberOfMessages);
-        const delayedMessages = parseInt(attributes.ApproximateNumberOfMessagesDelayed);
-        const nonVisibleMessages = parseInt(attributes.ApproximateNumberOfMessagesNotVisible);
+        const { Attributes } = await sqs.getQueueAttributes(params).promise();
+        const availableMessages = parseInt(Attributes.ApproximateNumberOfMessages);
+        const delayedMessages = parseInt(Attributes.ApproximateNumberOfMessagesDelayed);
+        const nonVisibleMessages = parseInt(Attributes.ApproximateNumberOfMessagesNotVisible);
 
         return { availableMessages, delayedMessages, nonVisibleMessages };
     } catch (err) {
@@ -122,6 +114,5 @@ module.exports = {
     sendMeesageToQueue,
     pullMessageFromQueue,
     deleteMessageFromQueue,
-    deleteQueue,
     getNumberOfMessagesInQueue,
 };
