@@ -37,7 +37,7 @@ const sendMeesageToQueue = async (queueURL, data) => {
 
     try {
         const { MessageId } = await sqs.sendMessage(params).promise();
-        console.log(chalk.blue(`Message ${chalk.bold(data.id)} was added to queue, ${chalk.bold(data.queueName)}!`));
+        // console.log(chalk.blue(`Message ${chalk.bold(data.id)} was added to queue, ${chalk.bold(data.queueName)}!`));
         return MessageId;
     } catch (err) {
         console.log(chalk.red.inverse('Error while creating a message on sqs:'), err);
@@ -49,7 +49,7 @@ const pullMessageFromQueue = async (queueURL) => {
         QueueUrl: queueURL,
         MessageAttributeNames: ['All'],
         MaxNumberOfMessages: 10,
-        VisibilityTimeout: 30,
+        VisibilityTimeout: 300,
         WaitTimeSeconds: 5,
     };
 
@@ -81,7 +81,7 @@ const deleteMessageFromQueue = async (queueURL, receiptHandle, messageID) => {
     };
 
     try {
-        const deletedMessage = await sqs.deleteMessage(params).promise();
+        await sqs.deleteMessage(params).promise();
         console.log(chalk.blue(`Message ${chalk.bold(messageID)} was deleted from the queue!`));
     } catch (err) {
         console.log(chalk.red.inverse('Error while deleting message from a queue:'), err);
@@ -107,6 +107,18 @@ const getNumberOfMessagesInQueue = async (queueURL) => {
         return { availableMessages, delayedMessages, nonVisibleMessages };
     } catch (err) {
         console.log(chalk.red.inverse('Error while fetching number of messages in queue!'), err);
+        return { availableMessages: 0, delayedMessages: 0, nonVisibleMessages: 0 };
+    }
+};
+
+const getQueueURL = async (queueName) => {
+    const params = { QueueName: `${queueName}.fifo` };
+
+    try {
+        const { QueueUrl } = await sqs.getQueueUrl(params).promise();
+        return QueueUrl;
+    } catch (err) {
+        console.log(chalk.red.inverse('Error fetching queue URL:'), err);
     }
 };
 
@@ -115,4 +127,5 @@ module.exports = {
     pullMessageFromQueue,
     deleteMessageFromQueue,
     getNumberOfMessagesInQueue,
+    getQueueURL,
 };

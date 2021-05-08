@@ -23,8 +23,23 @@ const getChildrenURLs = (children) => {
     return URLs;
 };
 
+const updateNodeByID = (id, updatedNode, root) => {
+    if (id.length === 1) return updatedNode;
+
+    let node = root;
+    for (let i = 2; i <= id.length - 2; i += 2) {
+        let workerID = id[i + 2];
+        if (i === id.length - 2) {
+            node.children[workerID] = updatedNode;
+            break;
+        }
+        node = node.children[workerID];
+    }
+};
+
 module.exports = {
     Node,
     createChildrenNodes,
     getChildrenURLs,
+    updateNodeByID,
 };
