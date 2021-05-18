@@ -27,14 +27,14 @@ const updateNodeByID = (id, updatedNode, root) => {
     if (id.length === 1) return updatedNode;
 
     let node = root;
-    for (let i = 2; i <= id.length - 2; i += 2) {
-        let workerID = id[i + 2];
-        if (i === id.length - 2) {
-            node.children[workerID] = updatedNode;
-            break;
-        }
+    const idArr = id.split('/');
+    for (let i = 1; i < idArr.length; i++) {
+        let workerID = idArr[i];
+        if (i === idArr.length - 1) node.children[workerID] = updatedNode;
         node = node.children[workerID];
     }
+
+    return root;
 };
 
 module.exports = {

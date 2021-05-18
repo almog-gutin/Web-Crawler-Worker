@@ -5,12 +5,11 @@ const {
     pullMessageFromQueue,
     deleteMessageFromQueue,
     getNumberOfMessagesInQueue,
-    getQueueURL,
 } = require('../../aws/sqs');
 const { redisGetTree, redisSetTree, redisGetNode, redisSetNode } = require('../redis/redisUtils');
 const parseURL = require('../parser/parserUtils');
 const { Node, createChildrenNodes, getChildrenURLs } = require('../tree/node');
-const { Tree, updateTree } = require('../tree/tree');
+const { Tree, updateTree, getNumOfNodesInDB } = require('../tree/tree');
 
 const createOrUpdateTree = async (node, messageAttributes, currentLevel, isNodeInDB) => {
     if (!isNodeInDB) await redisSetNode(node);
@@ -27,7 +26,7 @@ const createOrUpdateTree = async (node, messageAttributes, currentLevel, isNodeI
     await updateTree(node, messageAttributes, currentLevel);
 };
 
-const processMessage = async (queueURL, messageAttributes) => {
+const processMessage = async (queueURL, messageAttributes, numOfPages) => {
     const { queueName, url, id, maxLevel, maxPages } = messageAttributes;
     const level = parseInt(messageAttributes.level);
 
@@ -46,9 +45,9 @@ const processMessage = async (queueURL, messageAttributes) => {
             await createOrUpdateTree(node, messageAttributes, level + 1, true);
         }
 
-        for (let i = 0; i < node.children.length; i++) {
-            // console.log(!(await getQueueURL(queueName)));
-            // if (!(await getQueueURL(queueName))) return false;
+        let pagesGap = parseInt(maxPages) - numOfPages;
+        const levelGap = parseInt(maxLevel) - level;
+        for (let i = 0; levelGap > 0 && pagesGap > 0 && i < node.children.length; i++, pagesGap--) {
             const request = {
                 queueName,
                 id: node.children[i].id,
@@ -69,12 +68,18 @@ const processMessage = async (queueURL, messageAttributes) => {
 const handlePostMessages = async (queueURL, queueName) => {
     try {
         const tree = await redisGetTree(queueName);
-        if (!tree?.isTreeComplete) {
-            const { availableMessages } = await getNumberOfMessagesInQueue(queueURL);
-            if (availableMessages > 0) {
-                console.log('handleing post messages');
-                axios.post('http://localhost:8080/worker', { queueURL });
+        if (tree && !tree.isTreeComplete) {
+            const { availableMessages, delayedMessages, nonVisibleMessages } = await getNumberOfMessagesInQueue(
+                queueURL
+            );
+
+            if (availableMessages === 0 && delayedMessages === 0 && nonVisibleMessages == 0) {
+                console.log(true);
+                tree.isTreeComplete = true;
+                await redisSetTree(queueName);
             }
+
+            if (availableMessages > 0) axios.post('http://localhost:8080/worker', { queueURL });
         }
     } catch (err) {
         console.log(chalk.red.inverse('Error in handlePostMessages function:'), err);
@@ -83,18 +88,27 @@ const handlePostMessages = async (queueURL, queueName) => {
 
 const handleMessages = async (queueURL) => {
     try {
-        const { availableMessages } = await getNumberOfMessagesInQueue(queueURL);
+        const nmberOfMessagesInQueue = await getNumberOfMessagesInQueue(queueURL);
 
-        if (availableMessages > 0) {
+        if (nmberOfMessagesInQueue?.availableMessages > 0) {
             const messages = await pullMessageFromQueue(queueURL);
             if (messages) {
                 const queueName = messages[0].messageAttributes.queueName;
                 messages.forEach(async (message) => {
                     const { messageAttributes, receiptHandle } = message;
-                    const hasMessageBeenProcessed = await processMessage(queueURL, messageAttributes);
+                    const { availableMessages, delayedMessages, nonVisibleMessages } = await getNumberOfMessagesInQueue(
+                        queueURL
+                    );
+                    const numOfMessages = availableMessages + delayedMessages + nonVisibleMessages;
+                    const numOfPages = messageAttributes.id === '0' ? 0 : await getNumOfNodesInDB(queueName);
+                    const hasMessageBeenProcessed = await processMessage(
+                        queueURL,
+                        messageAttributes,
+                        numOfMessages + numOfPages
+                    );
                     if (hasMessageBeenProcessed) deleteMessageFromQueue(queueURL, receiptHandle, messageAttributes.id);
                 });
-                console.log('Foreach handlemessages finished!');
+
                 await handlePostMessages(queueURL, queueName);
             }
         }

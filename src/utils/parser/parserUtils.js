@@ -7,7 +7,10 @@ const parseURL = async (url) => {
     try {
         const result = await axios.get(url);
         const html = parse(result.data);
-        const title = html.querySelector('title').innerText;
+
+        let title = html.querySelector('title')?.innerText;
+        if (!title) title = url;
+
         const aElementsList = html.querySelectorAll('a');
         aElementsList.forEach((element) => {
             const link = element.attributes.href;
@@ -16,6 +19,7 @@ const parseURL = async (url) => {
         return { title, children };
     } catch (err) {
         console.log(chalk.red.inverse('Parser error!'), err);
+        return { title: '', children: [] };
     }
 };
 

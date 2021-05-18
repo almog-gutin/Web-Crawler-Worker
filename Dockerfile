@@ -1,4 +1,4 @@
-FROM node
+FROM node:alpine
 
 WORKDIR /app
 
@@ -12,5 +12,5 @@ ENV PORT=3030
 
 EXPOSE ${PORT}
 
-CMD [ "npm", "run", "docker-dev" ]
+CMD [ "npm", "start" ]
 
